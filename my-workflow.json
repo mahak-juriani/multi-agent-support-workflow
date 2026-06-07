@@ -1,0 +1,522 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a30ee71f-56f8-41f7-8a5c-f26402c72ccc",
+              "name": "Customer",
+              "value": "={{ $('Ticket Intake').item.json.body.customer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "580ac368-8933-4dfa-901f-f8d17eb74243",
+              "name": "Status",
+              "value": "Escalated",
+              "type": "string"
+            },
+            {
+              "id": "f2b2ba43-51fd-4057-8340-1d0c47f95085",
+              "name": "Response Quality",
+              "value": "={{ JSON.parse($('Response Quality Reviewer').item.json.choices[0].message.content).response_quality }}",
+              "type": "string"
+            },
+            {
+              "id": "52d4a925-cda0-43ff-b3b9-0d42ff40598c",
+              "name": "Confidence",
+              "value": "={{ JSON.parse($('Confidence Evaluator').item.json.choices[0].message.content).confidence }}",
+              "type": "string"
+            },
+            {
+              "id": "a05bcffe-7aa4-43a0-8ceb-43764948ce72",
+              "name": "Issue",
+              "value": "={{ $('Ticket Intake').item.json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        736,
+        -64
+      ],
+      "id": "f379941d-a851-4763-9870-b633b0a13552",
+      "name": "Store Ticket"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-support",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -656,
+        0
+      ],
+      "id": "50ce99ca-6bbe-4298-9e25-363db78c6379",
+      "name": "Ticket Intake",
+      "webhookId": "5fc714a3-715f-412e-ac75-0520bfe52949"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama-3.1-8b-instant"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [\n{\nrole:\"system\",\ncontent:\"Evaluate support response only. Return ONLY valid JSON with fields issue, response_quality, reason.\"\n},\n{\nrole:\"user\",\ncontent:\n\"Customer Request:\\n\" +$('Prepare Customer data').item.json.customer_issue\n +\n\"\\n\\nGenerated Response:\\n\" +\n$('Support Response Generator').item.json.choices[0].message.content +\n\"\\n\\nReturn response as JSON.\"\n}\n] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ { type:\"json_object\" } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "fda96e66-9998-444a-8cab-e9a532085cbf",
+      "name": "Response Quality Reviewer"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a customer support reviewer. Evaluate whether AI should automatically answer the customer. Return ONLY JSON. Format: {\\\"confidence\\\": number, \\\"escalate\\\": boolean}. Rules: Password reset → confidence=95 escalate=false. Delivery address → confidence=95 escalate=false. Order tracking → confidence=95 escalate=false. General account questions → confidence=90 escalate=false. Refund requests → confidence=40 escalate=true. Angry customers → confidence=30 escalate=true. Payment disputes → confidence=20 escalate=true. Legal threats → confidence=10 escalate=true. Be decisive.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Customer Issue:{{ $('Ticket Intake').item.json.body.message }} Support Reply: {{ JSON.parse($('Support Response Generator').item.json.choices[0].message.content).response }}\"\n    }\n  ],\n  \"response_format\": {\n    \"type\": \"json_object\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        176,
+        0
+      ],
+      "id": "0cfc44f6-0f63-4c62-9631-85e36e851993",
+      "name": "Confidence Evaluator"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2132039d-d5db-49f4-b9f2-7e5979e4d675",
+              "leftValue": "={{ JSON.parse($json.choices[0].message.content).confidence }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        0
+      ],
+      "id": "9239e37a-34b7-444d-83f7-80c3f030085f",
+      "name": "Resolution Router"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a30ee71f-56f8-41f7-8a5c-f26402c72ccc",
+              "name": "Customer",
+              "value": "={{ $('Ticket Intake').item.json.body.customer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "580ac368-8933-4dfa-901f-f8d17eb74243",
+              "name": "Status",
+              "value": "Resolved",
+              "type": "string"
+            },
+            {
+              "id": "f2b2ba43-51fd-4057-8340-1d0c47f95085",
+              "name": "Response Quality",
+              "value": "={{ JSON.parse($('Response Quality Reviewer').item.json.choices[0].message.content).response_quality }}",
+              "type": "string"
+            },
+            {
+              "id": "52d4a925-cda0-43ff-b3b9-0d42ff40598c",
+              "name": "Confidence",
+              "value": "={{ JSON.parse($('Confidence Evaluator').item.json.choices[0].message.content).confidence }}",
+              "type": "string"
+            },
+            {
+              "id": "a05bcffe-7aa4-43a0-8ceb-43764948ce72",
+              "name": "Issue",
+              "value": "={{ $('Ticket Intake').item.json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        352
+      ],
+      "id": "ee0ff050-1d1b-469b-a65e-e47c7b994e5e",
+      "name": "Store Resolution"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama-3.1-8b-instant"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [\n{\nrole:\"system\",\ncontent:\"You classify support tickets. Return ONLY JSON.\"\n},\n{\nrole:\"user\",\ncontent:\"Customer issue: \" + $json.customer_issue\n}\n] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {\ntype: \"json_object\"\n} }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "3360a829-ea2c-4082-98fe-3a21aad9b24e",
+      "name": "Support Response Generator"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cebd791c-ac5b-4493-94cd-d205799d91ce",
+              "name": "customer_issue",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -448,
+        0
+      ],
+      "id": "32792aee-6ec6-4797-bb55-aa6c62229f0c",
+      "name": "Prepare Customer data"
+    },
+    {
+      "parameters": {
+        "text": "=✅ SUPPORT UPDATE\n\nHello Customer,\n\nIssue Identified:\n{{ JSON.parse($('Response Quality Reviewer').item.json.choices[0].message.content).issue }}\n\nResolution:\n\nWe will send you a password reset link on you email.\n\nStatus:\nResolved Automatically\n\nIf this does not resolve your issue, please contact support again and we will assist further.\n\nThank you for contacting support.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        96
+      ],
+      "id": "686b40b2-891b-4f3c-a826-3f87d951dc21",
+      "name": "Notify Customer",
+      "webhookId": "84fe6713-0da2-4998-887f-7cd057bac454",
+      "credentials": {
+        "telegramApi": {
+          "id": "XODWjxMArNobqvuy",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful customer support agent. Solve the customer's issue directly. Return ONLY JSON: {\\\"resolution\\\":\\\"actual solution\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $('Ticket Intake').item.json.body }}\"\n    }\n  ],\n  \"response_format\": {\n    \"type\": \"json_object\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        96
+      ],
+      "id": "95d1c15c-a1f7-4712-b3de-be3ea4ebcfcd",
+      "name": "Resolution Generator"
+    },
+    {
+      "parameters": {
+        "text": "=🚨 SUPPORT REQUEST RECEIVED\n\nHello {{ $('Ticket Intake').item.json.body.customer_name }},\n\nYour request needs additional review by our support specialists.\n\nIssue:\n{{ $('Ticket Intake').item.json.body.message }}\n\nTicket Status:\nEscalated to Human Support\n\nExpected Response Time:\nWithin 2 business days\n(10:00 AM – 6:00 PM)\n\nReference:\nSUP-{{ Date.now() }}\n\nThank you for your patience.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        832,
+        -272
+      ],
+      "id": "90993d56-b407-46a8-83d6-65fae98f1cd3",
+      "name": "Notify Customer1",
+      "webhookId": "84fe6713-0da2-4998-887f-7cd057bac454",
+      "credentials": {
+        "telegramApi": {
+          "id": "XODWjxMArNobqvuy",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=🚨 SUPPORT ESCALATION ALERT  A customer request requires manual review.  Customer Request: {{ $('Prepare Customer data').item.json.customer_issue }} Quality Review: {{ $('Response Quality Reviewer').item.json.choices[0].message.content }}  Priority: HIGH  Status: Awaiting Human Review  Recommended Action: Review the ticket and send final customer response.  Reference: SUP-{{ Date.now() }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        -272
+      ],
+      "id": "432a54a6-d4ab-4af3-8040-dde166d55285",
+      "name": "Notify Support",
+      "webhookId": "62a4f921-1885-4380-8149-12dead8c8213",
+      "credentials": {
+        "telegramApi": {
+          "id": "XODWjxMArNobqvuy",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ticket Intake": {
+      "main": [
+        [
+          {
+            "node": "Prepare Customer data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Quality Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Confidence Evaluator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence Evaluator": {
+      "main": [
+        [
+          {
+            "node": "Resolution Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolution Router": {
+      "main": [
+        [
+          {
+            "node": "Notify Support",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolution Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Support Response Generator": {
+      "main": [
+        [
+          {
+            "node": "Response Quality Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Customer data": {
+      "main": [
+        [
+          {
+            "node": "Support Response Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Customer": {
+      "main": [
+        [
+          {
+            "node": "Store Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolution Generator": {
+      "main": [
+        [
+          {
+            "node": "Notify Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Customer1": {
+      "main": [
+        [
+          {
+            "node": "Store Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Support": {
+      "main": [
+        [
+          {
+            "node": "Notify Customer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "19ea7198-2c14-4aea-8505-82dad0ea6b80",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c95568ef78abaa5744dce4ad2c28f1def64307ccd18c176e1907d2183145b5c9"
+  },
+  "id": "WJ4UnVgZJc2x16SJ",
+  "tags": []
+}
