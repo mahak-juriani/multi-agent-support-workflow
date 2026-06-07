@@ -168,13 +168,9 @@ Result:
 ## Demo
 
 Video Demo (Google Drive):
-[Add Google Drive URL]
-
-Workflow Export:
-[Add workflow file]
+(https://drive.google.com/drive/folders/1IDEPG86ceJPzvGYRbBSJV97SWuOF8u5-?usp=drive_link)
 
 ---
 
-## Author
-
-Developed as part of the **Agentic Workflow Design and n8n Demo Assignment**.
+## Author 
+Mahak Juriani
